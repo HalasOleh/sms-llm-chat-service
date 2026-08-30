@@ -12,6 +12,10 @@
     "rootDir": ".",
     "outDir": "./dist",
     "incremental": true,
+    // The incremental build cache must live inside dist: nest build deletes
+    // dist before compiling, and a cache kept outside it makes tsc think the
+    // files are unchanged, leaving the build incomplete.
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "skipLibCheck": true,
     "strict": true,
     "strictNullChecks": true,

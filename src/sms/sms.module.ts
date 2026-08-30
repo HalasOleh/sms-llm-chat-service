@@ -4,6 +4,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { TwilioSignatureGuard } from './guards/twilio-signature.guard';
 import { MockSmsProvider } from './providers/mock-sms.provider';
 import { TwilioSmsProvider } from './providers/twilio-sms.provider';
+import { SmsController } from './sms.controller';
 import { SMS_PROVIDER, type ISmsProvider } from './sms-provider.interface';
 
 /**
@@ -14,6 +15,7 @@ import { SMS_PROVIDER, type ISmsProvider } from './sms-provider.interface';
  * sent.
  */
 @Module({
+  controllers: [SmsController],
   providers: [
     MockSmsProvider,
     TwilioSignatureGuard,

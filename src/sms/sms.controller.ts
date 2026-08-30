@@ -3,7 +3,6 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
-  Inject,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -15,7 +14,11 @@ import {
   type SmsReceivedEvent,
 } from '../messaging/events/sms-received.event';
 import { TwilioSignatureGuard } from './guards/twilio-signature.guard';
-import { SMS_PROVIDER, type ISmsProvider } from './sms-provider.interface';
+import {
+  parseGenericSms,
+  parseTwilioSms,
+} from './parsers/incoming-sms.parsers';
+import type { IncomingSms } from './sms-provider.interface';
 
 /**
  * Intake of incoming SMS.
@@ -34,32 +37,30 @@ import { SMS_PROVIDER, type ISmsProvider } from './sms-provider.interface';
 @Controller('webhook/sms')
 @UseGuards(TwilioSignatureGuard)
 export class SmsController {
-  constructor(
-    @Inject(SMS_PROVIDER) private readonly provider: ISmsProvider,
-    private readonly events: EventEmitter2,
-  ) {}
+  constructor(private readonly events: EventEmitter2) {}
 
   /** The generic JSON format — for local development and tests. */
   @Post()
   @HttpCode(HttpStatus.NO_CONTENT)
   receive(@Body() payload: unknown): void {
-    this.accept(payload);
+    this.accept(parseGenericSms(payload));
   }
 
   /**
-   * The Twilio format (form-encoded). A route of its own, because this is the
-   * path you configure in the Twilio console; the parsing inside is done by
-   * the same provider.
+   * The Twilio format (form-encoded) — this is the path you configure in the
+   * Twilio console.
+   *
+   * The parser is chosen by route rather than by the configured provider:
+   * receiving real Twilio webhooks while replying through the mock is an
+   * ordinary staging setup and has to work.
    */
   @Post('twilio')
   @HttpCode(HttpStatus.NO_CONTENT)
   receiveFromTwilio(@Body() payload: unknown): void {
-    this.accept(payload);
+    this.accept(parseTwilioSms(payload));
   }
 
-  private accept(payload: unknown): void {
-    const incoming = this.provider.parseIncoming(payload);
-
+  private accept(incoming: IncomingSms): void {
     const event: SmsReceivedEvent = {
       phoneNumber: normalizePhoneNumber(incoming.from),
       body: incoming.body,

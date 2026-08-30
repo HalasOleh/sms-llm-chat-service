@@ -68,10 +68,7 @@ describe('IncomingMessageHandler', () => {
       recordFeedback: jest.fn().mockResolvedValue(true),
     };
 
-    sms = {
-      parseIncoming: jest.fn(),
-      sendMessage: jest.fn().mockResolvedValue(undefined),
-    };
+    sms = { sendMessage: jest.fn().mockResolvedValue(undefined) };
 
     llm = { generateReply: jest.fn().mockResolvedValue('Reset it here.') };
 

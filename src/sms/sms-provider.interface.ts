@@ -9,22 +9,17 @@ export interface IncomingSms {
 }
 
 /**
- * The SMS provider contract: transport only.
+ * The SMS provider contract: sending only.
  *
- * A deliberately narrow interface. A provider can parse its own webhook
- * format and send a message — and that is all. It knows nothing about
- * ratings, the LLM or the database: that logic lives in
- * IncomingMessageHandler in one copy, rather than being duplicated in every
- * implementation.
+ * Parsing incoming webhooks deliberately lives in parsers/ — the payload
+ * format is decided by the route, not by who sends the replies. That keeps
+ * this interface down to a single method: adding Vonage means a class with
+ * one sendMessage and a line in the factory, with no obligation to implement
+ * anyone else's parsing.
  *
- * So adding Vonage means one new class and one line in the factory.
+ * A provider knows nothing about ratings, the LLM or the database — that
+ * logic lives in IncomingMessageHandler, in one copy.
  */
 export interface ISmsProvider {
-  /**
-   * Parses the raw webhook body. Throws when the payload does not match the
-   * expected format — that is an integration error, not a routine outcome.
-   */
-  parseIncoming(payload: unknown): IncomingSms;
-
   sendMessage(to: string, body: string): Promise<void>;
 }

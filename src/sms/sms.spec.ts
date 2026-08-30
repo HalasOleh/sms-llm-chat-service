@@ -7,8 +7,11 @@ import { normalizePhoneNumber } from '../common/phone.util';
 import { truncateForSms } from '../common/text.util';
 import type { AppConfigService } from '../config/app-config.service';
 import { TwilioSignatureGuard } from './guards/twilio-signature.guard';
+import {
+  parseGenericSms,
+  parseTwilioSms,
+} from './parsers/incoming-sms.parsers';
 import { MockSmsProvider } from './providers/mock-sms.provider';
-import { TwilioSmsProvider } from './providers/twilio-sms.provider';
 
 describe('normalizePhoneNumber', () => {
   it('collapses different spellings of one number into a single value', () => {
@@ -50,15 +53,9 @@ describe('truncateForSms', () => {
   });
 });
 
-describe('MockSmsProvider', () => {
-  let provider: MockSmsProvider;
-
-  beforeEach(() => {
-    provider = new MockSmsProvider();
-  });
-
+describe('parseGenericSms', () => {
   it('parses the generic JSON format from the assignment', () => {
-    const parsed = provider.parseIncoming({
+    const parsed = parseGenericSms({
       from: '+36123456789',
       body: 'How do I reset my password?',
       messageId: 'SM123456789',
@@ -74,13 +71,13 @@ describe('MockSmsProvider', () => {
   });
 
   it('rejects a payload missing required fields', () => {
-    expect(() => provider.parseIncoming({ from: '+36123456789' })).toThrow(
+    expect(() => parseGenericSms({ from: '+36123456789' })).toThrow(
       BadRequestException,
     );
   });
 
   it('leaves the timestamp empty when the provider did not send one', () => {
-    const parsed = provider.parseIncoming({
+    const parsed = parseGenericSms({
       from: '+36123456789',
       body: 'hi',
       messageId: 'SM1',
@@ -88,8 +85,12 @@ describe('MockSmsProvider', () => {
 
     expect(parsed.timestamp).toBeNull();
   });
+});
 
+describe('MockSmsProvider', () => {
   it('remembers what it sent so tests can assert on it', async () => {
+    const provider = new MockSmsProvider();
+
     await provider.sendMessage('+36123456789', 'Answer one');
     await provider.sendMessage('+36123456789', 'Answer two');
 
@@ -98,20 +99,9 @@ describe('MockSmsProvider', () => {
   });
 });
 
-describe('TwilioSmsProvider.parseIncoming', () => {
-  const config = {
-    twilio: {
-      accountSid: 'AC00000000000000000000000000000000',
-      authToken: 'test-token',
-      phoneNumber: '+15550001111',
-      webhookUrl: 'https://example.test/webhook/sms/twilio',
-    },
-  } as AppConfigService;
-
-  const provider = new TwilioSmsProvider(config);
-
+describe('parseTwilioSms', () => {
   it("parses Twilio's standard form-encoded format", () => {
-    const parsed = provider.parseIncoming({
+    const parsed = parseTwilioSms({
       From: '+36123456789',
       Body: 'How do I reset my password?',
       MessageSid: 'SM123456789',
@@ -124,16 +114,13 @@ describe('TwilioSmsProvider.parseIncoming', () => {
   });
 
   it('accepts a message with an empty body', () => {
-    const parsed = provider.parseIncoming({
-      From: '+36123456789',
-      MessageSid: 'SM1',
-    });
+    const parsed = parseTwilioSms({ From: '+36123456789', MessageSid: 'SM1' });
 
     expect(parsed.body).toBe('');
   });
 
   it('rejects a payload without MessageSid', () => {
-    expect(() => provider.parseIncoming({ From: '+36123456789' })).toThrow(
+    expect(() => parseTwilioSms({ From: '+36123456789' })).toThrow(
       BadRequestException,
     );
   });

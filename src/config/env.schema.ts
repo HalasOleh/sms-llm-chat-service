@@ -56,7 +56,10 @@ export const envSchema = z
     ADMIN_USERNAME: z.string().min(1, 'ADMIN_USERNAME is required'),
     ADMIN_PASSWORD_HASH: z.string().min(1, 'ADMIN_PASSWORD_HASH is required'),
     JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
-    JWT_EXPIRES_IN: z.string().default('1h'),
+    // In seconds rather than a string like "1h": the jsonwebtoken types expect
+    // a narrow literal type that an environment string does not satisfy
+    // without a cast. A number is unambiguous and needs no parsing.
+    JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(3600),
   })
   .superRefine((env, ctx) => {
     if (env.SMS_PROVIDER === 'twilio') {

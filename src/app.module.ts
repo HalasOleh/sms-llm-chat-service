@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
+import { AdminModule } from './admin/admin.module';
 import { AppConfigModule } from './config/app-config.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { DatabaseModule } from './database/database.module';
@@ -23,6 +24,7 @@ import { SmsModule } from './sms/sms.module';
     LlmModule,
     SmsModule,
     MessagingModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

@@ -82,10 +82,10 @@ export class AppConfigService {
     };
   }
 
-  get jwt(): { secret: string; expiresIn: string } {
+  get jwt(): { secret: string; expiresInSeconds: number } {
     return {
       secret: this.get('JWT_SECRET'),
-      expiresIn: this.get('JWT_EXPIRES_IN'),
+      expiresInSeconds: this.get('JWT_EXPIRES_IN_SECONDS'),
     };
   }
 }

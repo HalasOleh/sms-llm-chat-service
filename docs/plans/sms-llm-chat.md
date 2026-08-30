@@ -2,6 +2,10 @@
 
 > Version 2. Synchronised with spec v2 (`docs/specs/sms-llm-chat.md`).
 > Changelog at the end of the document.
+>
+> This is the plan as it stood before implementation. Where the finished code
+> diverges from it, the reasons are recorded under "Deviations during
+> implementation" at the end rather than edited into the plan itself.
 
 Stack: NestJS + TypeScript, PostgreSQL + Prisma, JWT for the admin API, real
 Twilio + OpenAI providers behind interfaces (mock is the default when no keys
@@ -250,6 +254,53 @@ providers behind interfaces, admin auth, and an e2e test of the core flow.
 - A repeat POST with the same `MessageSid` creates no second record.
 - `npm test && npm run test:e2e` green.
 - The README lets a stranger bring the project up without further questions.
+
+## Deviations during implementation
+
+Recorded after the fact. Each of these was forced by something the plan could
+not have known; the commit that made the change explains it in full.
+
+**Prisma → TypeORM.** Prisma downloads its schema engine from
+`binaries.prisma.sh`, which the development environment's egress policy
+blocks — neither `migrate` nor `generate` works, so a typed client never
+exists. Rather than writing the entire data layer and its e2e tests blind, the
+layer moved to TypeORM: plain JavaScript with no binaries, native Nest
+integration, the same capabilities. The change cost zero edits outside the
+`conversations` module, which is exactly what `IConversationRepository` was
+introduced for. Consequences: the schema above is TypeORM entity definitions
+rather than `schema.prisma`, `src/prisma/` became `src/database/`, and the
+duplicate-detection code catches Postgres error `23505` instead of Prisma's
+`P2002`.
+
+**NestJS 12 → 11.** NestJS 12 turned out to be ESM-only. The runtime survives
+that via `require(esm)` on Node 22.12+, but Jest needs Node 24.9+, so the
+tests did not run at all. Moving the whole toolchain to ESM for that is work
+with no benefit to this task, so the framework was rolled back to the stable
+11 line with CJS (and TypeScript 6 to 5.9 with it).
+
+**Parsing moved out of the provider.** The plan gave `ISmsProvider` both
+`sendMessage()` and `parseIncoming()`. The e2e tests found the flaw: the
+provider is selected by `SMS_PROVIDER`, so receiving a real Twilio webhook
+while replying through the mock — an ordinary staging setup — returned 400.
+The payload format is a property of the ROUTE the request arrived on, not of
+who sends the replies. Parsing moved into `sms/parsers/` as pure functions and
+`ISmsProvider` narrowed to a single `sendMessage()`.
+
+**Test layout.** The plan put unit tests under `test/unit/`. They ended up
+next to the code they cover (`src/**/*.spec.ts`), with `test/` holding only
+the e2e suites and the harness — the standard Nest arrangement, and it keeps a
+test in view when its subject changes. The three separate e2e files became two
+(`sms-flow.e2e-spec.ts` covering the core flow, idempotency and feedback;
+`admin.e2e-spec.ts` covering auth), because they share one application
+harness.
+
+**Added beyond the plan.** A graceful drain on shutdown: the handler tracks
+messages in flight and `onApplicationShutdown` waits for them, so an ordinary
+deploy does not lose an accepted message. The plan accepted that loss
+unconditionally; a crash still causes it, but a restart no longer does. Also
+an explicit initial migration plus a CLI data source — `synchronize` covers
+development, and without migrations a production deployment would have come up
+against an empty schema.
 
 ## Changelog
 

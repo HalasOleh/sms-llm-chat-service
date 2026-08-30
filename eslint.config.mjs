@@ -14,7 +14,14 @@ export default tseslint.config(
     languageOptions: {
       globals: { ...globals.node, ...globals.jest },
       parserOptions: {
-        projectService: true,
+        projectService: {
+          // The root config files (this one, jest.config.js,
+          // jest-e2e.config.js) are deliberately outside tsconfig's include,
+          // so the type-aware parser has no project for them. Without this
+          // they fail to parse and `eslint .` reports errors that say nothing
+          // about the code.
+          allowDefaultProject: ['*.js', '*.mjs'],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },

@@ -14,10 +14,9 @@
     "test": "jest --config jest.config.js",
     "test:watch": "jest --config jest.config.js --watch",
     "test:e2e": "jest --config jest-e2e.config.js --runInBand",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "hash:password": "ts-node scripts/hash-password.ts"
   },
   "dependencies": {

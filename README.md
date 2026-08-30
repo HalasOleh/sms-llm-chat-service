@@ -66,6 +66,22 @@ npm run test:e2e  # 15 e2e tests against a real PostgreSQL
 E2E use a separate database (`sms_llm_chat_test`); create it once with
 `docker compose exec postgres createdb -U sms sms_llm_chat_test`.
 
+### Schema
+
+Outside production the schema is created from the entities on boot
+(`synchronize`). Production runs migrations instead:
+
+```bash
+npm run migration:run                                    # apply
+npm run migration:revert                                 # roll the last one back
+npm run migration:generate -- src/database/migrations/<Name>   # after an entity change
+```
+
+`migration:generate` against an up-to-date database prints "No changes in
+database schema were found" — that is the check that the entities and the
+migrations still describe the same schema.
+
+
 ---
 
 ## API
@@ -205,7 +221,10 @@ for short answers; `SMS_MAX_LENGTH` makes sure one verbose reply cannot become
 ten billed segments.
 
 **PostgreSQL from the start**, with `synchronize` enabled only outside
-production, where migrations take over.
+production, where migrations take over. The initial migration is generated from
+the entities rather than hand-written, and it creates the `uuid-ossp` extension
+explicitly: TypeORM will do that implicitly on connect, but only if the database
+user may create extensions, and finding that out during a deploy is expensive.
 
 ---
 
@@ -257,7 +276,7 @@ src/
   common/         phone (E.164) and SMS length helpers
   config/         env schema (zod) + typed access, validated at startup
   conversations/  entity, repository interface + TypeORM implementation, service
-  database/       TypeORM wiring
+  database/       TypeORM wiring, CLI data source, migrations
   llm/            ILlmProvider, mock and OpenAI implementations, factory
   messaging/      the flow: event, feedback parser, IncomingMessageHandler
   sms/            ISmsProvider, mock and Twilio implementations, parsers, guard

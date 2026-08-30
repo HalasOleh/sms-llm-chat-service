@@ -32,6 +32,10 @@ export class AppConfigService {
     return this.nodeEnv === 'production';
   }
 
+  get databaseUrl(): string {
+    return this.get('DATABASE_URL');
+  }
+
   get smsProvider(): Env['SMS_PROVIDER'] {
     return this.get('SMS_PROVIDER');
   }

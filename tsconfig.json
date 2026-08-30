@@ -21,7 +21,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*", "test/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]

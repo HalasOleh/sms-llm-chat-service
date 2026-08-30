@@ -59,7 +59,7 @@ curl -X POST localhost:3000/webhook/sms \
 Tests:
 
 ```bash
-npm test          # 35 unit tests, no database, no network
+npm test          # 37 unit tests, no database, no network
 npm run test:e2e  # 15 e2e tests against a real PostgreSQL
 ```
 
@@ -80,7 +80,6 @@ npm run migration:generate -- src/database/migrations/<Name>   # after an entity
 `migration:generate` against an up-to-date database prints "No changes in
 database schema were found" — that is the check that the entities and the
 migrations still describe the same schema.
-
 
 ---
 
@@ -226,6 +225,12 @@ the entities rather than hand-written, and it creates the `uuid-ossp` extension
 explicitly: TypeORM will do that implicitly on connect, but only if the database
 user may create extensions, and finding that out during a deploy is expensive.
 
+**Shutdown drains what is in flight.** Because the webhook is acknowledged
+before the message is processed, at any instant there is work that exists only
+in memory. `IncomingMessageHandler` tracks it and `onApplicationShutdown` waits
+for it, so an ordinary deploy or scale-down does not drop messages. A hard crash
+still does — that is what the durable queue below is for.
+
 ---
 
 ## Future improvements
@@ -233,9 +238,10 @@ user may create extensions, and finding that out during a deploy is expensive.
 Ordered by what I would do next, not by size.
 
 1. **Durable queue (BullMQ/Redis) instead of the in-process bus** — removes the
-   one accepted failure mode: messages lost if the process dies mid-flight. Also
-   brings retries with backoff for LLM and SMS calls, which are currently
-   single-attempt.
+   one accepted failure mode. A graceful shutdown already covers deploys and
+   scale-downs; a hard crash, an OOM kill or a lost pod still loses whatever was
+   mid-flight, and only durable storage fixes that. Also brings retries with
+   backoff for LLM and SMS calls, which are currently single-attempt.
 2. **Conversation memory** — every reply is generated in isolation today. Storing
    and replaying recent turns changes `ILlmProvider` in one place, by design.
 3. **Delivery status** — the column exists; the Twilio status callback webhook

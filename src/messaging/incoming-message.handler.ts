@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationShutdown,
+} from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { truncateForSms } from '../common/text.util';
@@ -22,11 +27,23 @@ import { parseFeedback } from './feedback-parser';
  * with a status showing exactly which step stopped.
  */
 @Injectable()
-export class IncomingMessageHandler {
+export class IncomingMessageHandler implements OnApplicationShutdown {
   private static readonly FALLBACK_REPLY =
     'Sorry, we could not process your message right now. Please try again later.';
 
   private readonly logger = new Logger(IncomingMessageHandler.name);
+
+  /**
+   * Messages accepted but not yet finished.
+   *
+   * The webhook is acknowledged before processing starts, so at any instant
+   * there is work in progress that nothing else knows about. On shutdown that
+   * work is awaited instead of vanishing with the process — which covers the
+   * ordinary case of a deploy or a scale-down. A hard crash still loses these
+   * messages; only a durable queue fixes that, and it is the first item under
+   * future improvements in the README.
+   */
+  private readonly inFlight = new Set<Promise<void>>();
 
   constructor(
     private readonly conversations: ConversationsService,
@@ -36,7 +53,29 @@ export class IncomingMessageHandler {
   ) {}
 
   @OnEvent(SMS_RECEIVED, { async: true })
-  async handle(event: SmsReceivedEvent): Promise<void> {
+  handle(event: SmsReceivedEvent): Promise<void> {
+    const task = this.runSafely(event);
+    this.inFlight.add(task);
+
+    return task.finally(() => {
+      this.inFlight.delete(task);
+    });
+  }
+
+  async onApplicationShutdown(): Promise<void> {
+    if (this.inFlight.size === 0) {
+      return;
+    }
+
+    this.logger.log(
+      `Shutting down: finishing ${this.inFlight.size} message(s) in progress`,
+    );
+    // allSettled, not all: runSafely never rejects, but a drain that could
+    // itself throw would defeat the point of draining.
+    await Promise.allSettled([...this.inFlight]);
+  }
+
+  private async runSafely(event: SmsReceivedEvent): Promise<void> {
     try {
       await this.process(event);
     } catch (error) {

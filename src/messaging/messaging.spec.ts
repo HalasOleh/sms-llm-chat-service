@@ -187,4 +187,34 @@ describe('IncomingMessageHandler', () => {
 
     await expect(handler.handle(event)).resolves.toBeUndefined();
   });
+
+  it('finishes a message already in progress before shutting down', async () => {
+    // The webhook was acknowledged, so this message exists nowhere but in
+    // memory. A deploy at this instant must not drop it.
+    let releaseModel!: (reply: string) => void;
+    llm.generateReply.mockReturnValue(
+      new Promise<string>((resolve) => {
+        releaseModel = resolve;
+      }),
+    );
+
+    const processing = handler.handle(event);
+    await Promise.resolve();
+    expect(sms.sendMessage).not.toHaveBeenCalled();
+
+    const draining = handler.onApplicationShutdown();
+    releaseModel('Reset it here.');
+    await draining;
+
+    expect(sms.sendMessage).toHaveBeenCalledWith(
+      event.phoneNumber,
+      'Reset it here.',
+    );
+    expect(conversations.markCompleted).toHaveBeenCalledWith('conv_1');
+    await processing;
+  });
+
+  it('shuts down immediately when nothing is in progress', async () => {
+    await expect(handler.onApplicationShutdown()).resolves.toBeUndefined();
+  });
 });

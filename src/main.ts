@@ -20,6 +20,12 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  // The webhook is acknowledged before the message is processed, so on SIGTERM
+  // there is work in flight that the HTTP layer no longer knows about. Without
+  // shutdown hooks that work disappears with the process on every deploy;
+  // with them, IncomingMessageHandler gets to finish it.
+  app.enableShutdownHooks();
+
   const config = app.get(AppConfigService);
   await app.listen(config.port);
 
